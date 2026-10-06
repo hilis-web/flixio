@@ -15,6 +15,7 @@ CREATE TABLE card_groups (
     category_id INTEGER REFERENCES categories(id),
     title VARCHAR(100) NOT NULL,
     description TEXT,
+    image_url TEXT,
     is_public BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW()
 );
