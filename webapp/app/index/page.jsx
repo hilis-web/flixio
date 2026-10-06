@@ -1,3 +1,4 @@
+"use client";
 import Sidebar from "../../components/SideBar";
 import Categories from "../../components/CategorySelect";
 import SearchBar from "../../components/SearchBar";
