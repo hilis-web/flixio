@@ -1,14 +1,31 @@
 const express = require("express");
 const router = express.Router();
+
 const savedGroupsController = require("../controllers/savedGroupsController");
+const authMiddleware = require("../middleware/authMiddleware");
 
-// SAVE or UNSAVE group
-router.post("/groups/:groupId", savedGroupsController.toggleSave);
+// Save or unsave a group — authenticated user only
+router.post(
+  "/groups/:groupId",
+  authMiddleware,
+  savedGroupsController.toggleSave,
+);
 
-// Get user's saved groups
-router.get("/user/:userId", savedGroupsController.getSavedGroups);
+// Get the authenticated user's saved groups
+router.get("/me", authMiddleware, savedGroupsController.getSavedGroups);
 
-// Delete by savedId (اختياري)
-router.delete("/:savedId", savedGroupsController.deleteSavedGroup);
+// Legacy route — temporarily retained and protected
+router.get(
+  "/user/:userId",
+  authMiddleware,
+  savedGroupsController.getSavedGroups,
+);
+
+// Delete a saved group — authenticated user only
+router.delete(
+  "/:savedId",
+  authMiddleware,
+  savedGroupsController.deleteSavedGroup,
+);
 
 module.exports = router;

@@ -29,14 +29,14 @@ export default function UserProfilePage() {
 
     const fetchData = async () => {
       try {
-        const res = await API.get(`api/users/${user.id}`);
+        const res = await API.get("/api/users/me");
         setUsername(res.data.user.username);
         setEmail(res.data.user.email);
         // فقط فئات صالحة
         setSelectedCategories(
           res.data.interests
-            .map((c: Category) => c.id)
-            .filter((id: number) => id > 0)
+            .map((c: { category_id: number }) => Number(c.category_id))
+            .filter((id: number) => id > 0),
         );
 
         const catsRes = await API.get("/categories");
@@ -64,15 +64,19 @@ export default function UserProfilePage() {
   // --------------------------
   // Save profile & interests
   // --------------------------
+
   const handleSave = async () => {
     if (!user) return;
 
     try {
-      // تحديث بيانات اليوزر
-      await API.put(`api/users/${user.id}`, { username, email });
+      // Update the authenticated user's profile
+      await API.put("/api/users/me", {
+        username,
+        email,
+      });
 
-      // تحديث الاهتمامات → فقط فئات صالحة (>0)
-      await API.put(`api/users/${user.id}/interests`, {
+      // Update the authenticated user's interests
+      await API.put("/api/users/me/interests", {
         interests: selectedCategories.filter((id) => id > 0),
       });
 

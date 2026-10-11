@@ -42,7 +42,9 @@ export default function InterestsPage() {
     if (!user) return alert("You must be logged in.");
 
     try {
-      await API.post(`/users/${user.id}/interests`, { interests: selected });
+      await API.put("/api/users/me/interests", {
+        interests: selected,
+      });
       alert("Interests saved!");
       router.push("/"); // بعدها يظهر Timeline مخصص
     } catch (err) {

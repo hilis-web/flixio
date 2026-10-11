@@ -1,14 +1,20 @@
 const express = require("express");
 const router = express.Router();
+
 const usersController = require("../controllers/usersController");
+const authMiddleware = require("../middleware/authMiddleware");
 
-// جلب بيانات المستخدم واهتماماته
-router.get("/:userId", usersController.getUserProfile);
+// Get the authenticated user's profile
+router.get("/me", authMiddleware, usersController.getUserProfile);
 
-// تعديل بيانات المستخدم
-router.put("/:userId", usersController.updateUserProfile);
+// Update the authenticated user's profile
+router.put("/me", authMiddleware, usersController.updateUserProfile);
 
-// تعديل اهتمامات المستخدم
-router.put("/:userId/interests", usersController.updateUserInterests);
+// Update the authenticated user's interests
+router.put(
+  "/me/interests",
+  authMiddleware,
+  usersController.updateUserInterests,
+);
 
 module.exports = router;

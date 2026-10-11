@@ -1,14 +1,21 @@
 const express = require("express");
 const router = express.Router();
+
 const commentsController = require("../controllers/commentsController");
+const authMiddleware = require("../middleware/authMiddleware");
+const optionalAuthMiddleware = require("../middleware/optionalAuthMiddleware");
 
-// Get all comments for a group
-router.get("/group/:groupId", commentsController.getCommentsByGroup);
+// Read comments — public groups are accessible to everyone
+router.get(
+  "/group/:groupId",
+  optionalAuthMiddleware,
+  commentsController.getCommentsByGroup,
+);
 
-// Add a comment
-router.post("/", commentsController.addComment);
+// Add a comment — authentication required
+router.post("/", authMiddleware, commentsController.addComment);
 
-// Delete a comment
-router.delete("/:commentId", commentsController.deleteComment);
+// Delete a comment — authentication required
+router.delete("/:commentId", authMiddleware, commentsController.deleteComment);
 
 module.exports = router;

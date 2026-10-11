@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-
+const authMiddleware = require("./middleware/authMiddleware");
 const app = express();
 
 const PORT = process.env.PORT || 5000;
@@ -12,9 +12,10 @@ const pool = require("./db");
 // -----------------------------
 // CORS
 // -----------------------------
+
 const allowedOrigins = [
   "http://localhost:3000",
-  "http://192.168.1.36:3000",
+  "http://192.168.1.33:3000",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
@@ -67,6 +68,12 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
+app.get("/test-auth", authMiddleware, (req, res) => {
+  res.json({
+    message: "Authentication successful",
+    user: req.user,
+  });
+});
 // -----------------------------
 // Start server
 // -----------------------------

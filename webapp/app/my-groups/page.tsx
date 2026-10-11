@@ -28,15 +28,15 @@ export default function MyGroups() {
 
     const fetchMyGroups = async () => {
       try {
-        const res = await API.get(`/groups/user/${user.id}`);
-        console.log(res.data);
+        const res = await API.get("/groups/me");
         setGroups(res.data);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to fetch my groups:", err);
       }
     };
+
     fetchMyGroups();
-  }, []);
+  }, [user]);
 
   return (
     <div className="p-6">

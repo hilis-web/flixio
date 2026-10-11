@@ -2,52 +2,85 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import Card from "./Card";
-import API from "../lib/api";
 import { FaTrash, FaEdit, FaHeart } from "react-icons/fa";
-import Link from "next/link";
-// import router from "next/router";
+import API from "../lib/api";
 import { useRouter } from "next/navigation";
 
-interface GroupCardProps {
-  group: {
-    id: number;
-    title: string;
-    description: string;
-    category_name?: string;
-    image_url?: string;
-    is_public?: boolean;
-    cards?: { id: number; front_text: string; back_text: string }[];
-  };
-  editable?: boolean;
+interface GroupCardData {
+  id: number;
+  title: string;
+  description: string;
+  category_name?: string;
+  image_url?: string;
+  is_public?: boolean;
+  isSaved?: boolean;
+  cards?: { id: number; front_text: string; back_text: string }[];
 }
 
-export default function GroupCard({ group, editable = false }: GroupCardProps) {
-  console.log("group in group card", group);
+interface GroupCardProps {
+  group: GroupCardData;
+  editable?: boolean;
+  onSavedChange?: (groupId: number, saved: boolean) => void;
+  onDeleted?: (groupId: number) => void;
+}
+
+export default function GroupCard({
+  group,
+  editable = false,
+  onSavedChange,
+  onDeleted,
+}: GroupCardProps) {
   const router = useRouter();
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(Boolean(group.isSaved));
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleSave = async () => {
+    if (saving) return;
+
+    setSaving(true);
+
     try {
-      await API.post("/saved-groups", { user_id: 2, group_id: group.id });
-      setSaved(true);
+      const response = await API.post(`/saved-groups/groups/${group.id}`);
+
+      const isSaved = Boolean(response.data.saved);
+
+      setSaved(isSaved);
+      onSavedChange?.(group.id, isSaved);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to save or unsave group:", err);
+      alert("Could not update the saved group. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this group?")) return;
+    if (deleting) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this group?",
+    );
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+
     try {
       await API.delete(`/groups/${group.id}`);
-      alert("Group deleted!");
+      onDeleted?.(group.id);
+      alert("Group deleted successfully.");
     } catch (err) {
-      console.error(err);
+      console.error("Failed to delete group:", err);
+      alert("Could not delete the group. Please try again.");
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const handleEdit = async () => {
-    alert("edit");
+  const handleEdit = () => {
+    // Editing is not implemented yet.
+    alert("The edit feature is not implemented yet.");
   };
 
   return (
@@ -55,87 +88,95 @@ export default function GroupCard({ group, editable = false }: GroupCardProps) {
       className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300"
       whileHover={{ scale: 1.02 }}
     >
-      {/* Image */}
       <div className="relative h-40 w-full">
         <img
-          src={group.image_url || "/placeholder.jpg"} // fallback للصور
-          alt={group.title || "Group Image"} // fallback للalt
+          src={group.image_url || "/placeholder.jpg"}
+          alt={group.title || "Group image"}
           className="h-full w-full object-cover"
         />
 
-        {/* Public Toggle */}
         <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full flex items-center gap-2 shadow">
           <span className="text-xs font-medium text-gray-700">
             {group.is_public ? "Public" : "Private"}
           </span>
+
           <input
             type="checkbox"
-            checked={!!group.is_public} // تأكد انه boolean
-            onChange={() => {}}
-            className="accent-blue-600 cursor-pointer"
+            checked={Boolean(group.is_public)}
+            readOnly
+            aria-label={group.is_public ? "Public group" : "Private group"}
+            className="accent-blue-600"
           />
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4 flex flex-col gap-3">
-        {/* Title + Actions */}
-        <div className="flex justify-between items-start">
-          <div>
+        <div className="flex justify-between items-start gap-3">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-gray-800">
               {group.title || "Untitled Group"}
             </h2>
+
             <span className="text-xs text-gray-500">
               {group.category_name || "Uncategorized"}
             </span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-3 shrink-0">
             {editable && (
-              <FaEdit
-                className="cursor-pointer text-blue-500 hover:text-blue-700"
+              <button
+                type="button"
                 onClick={handleEdit}
-              />
+                aria-label="Edit group"
+                title="Edit group"
+                className="text-blue-600 hover:text-blue-800"
+              >
+                <FaEdit />
+              </button>
             )}
+
             {editable && (
-              <FaTrash
-                className="cursor-pointer text-red-500 hover:text-red-700"
+              <button
+                type="button"
                 onClick={handleDelete}
-              />
+                disabled={deleting}
+                aria-label="Delete group"
+                title="Delete group"
+                className="text-red-600 hover:text-red-800 disabled:opacity-50"
+              >
+                <FaTrash />
+              </button>
             )}
+
             {!editable && (
-              <FaHeart
-                className={`cursor-pointer ${
-                  saved ? "text-red-500" : "text-gray-400"
-                }`}
+              <button
+                type="button"
                 onClick={handleSave}
-              />
+                disabled={saving}
+                aria-label={saved ? "Unsave group" : "Save group"}
+                title={saved ? "Unsave group" : "Save group"}
+                className={`disabled:opacity-50 ${
+                  saved
+                    ? "text-red-500 hover:text-red-700"
+                    : "text-gray-500 hover:text-red-500"
+                }`}
+              >
+                <FaHeart />
+              </button>
             )}
           </div>
         </div>
 
-        {/* Description */}
-        <p className="text-sm text-gray-600 line-clamp-2">
-          {group.description || "No description"}
-        </p>
+        <p className="text-gray-700">{group.description || "No description"}</p>
 
-        {/* Cards Preview */}
         {group.cards && group.cards.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {group.cards.slice(0, 2).map((card) => (
-              <Card
-                key={card.id}
-                front={card.front_text || ""}
-                back={card.back_text || ""}
-              />
-            ))}
-          </div>
+          <p className="text-sm text-gray-500">{group.cards.length} cards</p>
         )}
 
-        {/* Footer */}
         <button
-          className="mt-2 w-full py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          type="button"
           onClick={() => router.push(`/group/${group.id}`)}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
         >
           View Group
         </button>

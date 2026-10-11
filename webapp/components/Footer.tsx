@@ -1,30 +1,35 @@
+"use client";
+
 import Link from "next/link";
 import CategorySelect from "./CategorySelect";
 
 interface FooterProps {
   variant?: "default" | "sidebar";
+  onCategoryChange?: (selectedIds: number[]) => void;
 }
 
-const Footer = ({ variant = "default" }: FooterProps) => {
+const Footer = ({ variant = "default", onCategoryChange }: FooterProps) => {
   if (variant === "sidebar") {
     return (
       <div className="bg-white rounded-xl border p-4 text-sm text-slate-600 shadow w-64">
-        {/* <h3 className="font-semibold mb-3">Flixio</h3> */}
-        <CategorySelect /> {/* هنا نضيف الـ component */}
-        {/* Links horizontal */}
+        <CategorySelect onChange={onCategoryChange} />
+
         <div className="flex flex-wrap gap-2 mt-4">
           <Link href="/about">About</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/privacy">Privacy</Link>
         </div>
+
         <p className="mt-4 text-xs text-slate-400">
           © {new Date().getFullYear()} Flixio
         </p>
+
         <span className="text-xs">
           Powered by{" "}
           <a
             href="http://www.google.com"
             target="_blank"
+            rel="noopener noreferrer"
             className="text-sky-600"
           >
             NeoDevHub
@@ -42,14 +47,17 @@ const Footer = ({ variant = "default" }: FooterProps) => {
           <a
             href="http://www.google.com"
             target="_blank"
+            rel="noopener noreferrer"
             className="text-sky-600"
           >
             NeoDevHub
           </a>
         </span>
+
         <span>
           © {new Date().getFullYear()} <Link href="/">Flixio</Link>
         </span>
+
         <div className="flex gap-4">
           <Link href="/about">About</Link>
           <Link href="/terms">Terms</Link>

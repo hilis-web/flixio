@@ -1,20 +1,31 @@
 const express = require("express");
 const router = express.Router();
+const optionalAuthMiddleware = require("../middleware/optionalAuthMiddleware");
 const groupsController = require("../controllers/groupsController");
+const authMiddleware = require("../middleware/authMiddleware");
+const likesController = require("../controllers/likesController");
 
-// Get all public groups (timeline)
-router.get("/public", groupsController.getPublicGroups);
+// Public groups — available to everyone
+router.get("/public", optionalAuthMiddleware, groupsController.getPublicGroups);
 
-// Create group
-router.post("/", groupsController.createGroup);
+// Create group — authenticated
+router.post("/", authMiddleware, groupsController.createGroup);
 
-// Get groups by user
-router.get("/user/:userId", groupsController.getUserGroups);
+// Get own groups — authenticated
+router.get("/me", authMiddleware, groupsController.getMyGroups);
 
-// Get single group + cards
-router.get("/:groupId", groupsController.getGroupWithCards);
+// Update group — authenticated owner only
+router.put("/:groupId", authMiddleware, groupsController.updateGroup);
 
-// Delete group
-router.delete("/:groupId", groupsController.deleteGroup);
+// Delete group — authenticated owner only
+router.delete("/:groupId", authMiddleware, groupsController.deleteGroup);
 
+// Get single group + cards — visibility protection comes next
+router.get(
+  "/:groupId",
+  optionalAuthMiddleware,
+  groupsController.getGroupWithCards,
+);
+
+router.post("/:groupId/like", authMiddleware, likesController.toggleLike);
 module.exports = router;

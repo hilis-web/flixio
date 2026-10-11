@@ -58,3 +58,18 @@ INSERT INTO categories (name) VALUES
 ('Programming'),
 ('Art'),
 ('Medicine');
+
+CREATE TABLE IF NOT EXISTS group_likes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+    group_id INTEGER NOT NULL
+        REFERENCES card_groups(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_user_group_like
+        UNIQUE (user_id, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_likes_group_id
+    ON group_likes(group_id);
+

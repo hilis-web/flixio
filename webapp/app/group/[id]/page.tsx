@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import API from "../../../lib/api";
 import { useAuth } from "../../context/auth-context";
 import Card from "../../../components/Card";
+import CommentsSection from "../../../components/CommentsSection";
 import {
   FaPlus,
   FaMoon,
@@ -190,6 +191,14 @@ export default function GroupDetailsPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="max-w-6xl mx-auto mt-8">
+          <div className="rounded-xl bg-white p-5 shadow dark:bg-gray-800">
+            <h2 className="mb-3 text-xl font-bold">Group Discussion</h2>
+
+            <CommentsSection groupId={Number(group.id)} defaultOpen />
+          </div>
         </div>
 
         {/* Floating Add Card */}

@@ -1,8 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  //baseURL: "http://localhost:5000", // رابط الـ backend المحلي
-  baseURL: "https://flixio-h9fc.onrender.com", // LIVE
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
 });
 
 export default API;

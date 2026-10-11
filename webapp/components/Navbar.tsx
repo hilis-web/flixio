@@ -16,7 +16,7 @@ export default function Navbar() {
       <h1 className="text-2xl font-bold text-blue-600">Flixio</h1>
 
       <div className="flex space-x-6 text-lg">
-        <Link href="/timeline" className={linkStyle("/timeline")}>
+        <Link href="/feeds" className={linkStyle("/feeds")}>
           Timeline
         </Link>
 

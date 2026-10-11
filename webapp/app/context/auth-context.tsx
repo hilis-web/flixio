@@ -9,89 +9,128 @@ interface User {
   email: string;
 }
 
+interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<any>;
-  signup: (username: string, email: string, password: string) => Promise<any>;
+  login: (email: string, password: string) => Promise<User>;
+  signup: (username: string, email: string, password: string) => Promise<User>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+function isValidUser(value: unknown): value is User {
+  if (!value || typeof value !== "object") return false;
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "number" &&
+    typeof candidate.username === "string" &&
+    typeof candidate.email === "string"
+  );
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user/token from localStorage on first load
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
+    try {
+      const storedToken = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
 
-    if (storedToken && storedUser) {
+      if (!storedToken || !storedUser) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        delete API.defaults.headers.common["Authorization"];
+        return;
+      }
+
+      const parsedUser: unknown = JSON.parse(storedUser);
+
+      if (!isValidUser(parsedUser)) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        delete API.defaults.headers.common["Authorization"];
+        return;
+      }
+
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      setUser(parsedUser);
       API.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+    } catch {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      delete API.defaults.headers.common["Authorization"];
+      setToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, []);
 
-  // -----------------------------
-  // LOGIN
-  // -----------------------------
-  const login = async (email: string, password: string) => {
-    const res = await API.post("/auth/login", { email, password });
+  const login = async (email: string, password: string): Promise<User> => {
+    const res = await API.post<AuthResponse>("/auth/login", {
+      email,
+      password,
+    });
 
-    const token = res.data.token;
-    const user = res.data.user;
+    const { token: newToken, user: loggedInUser } = res.data;
 
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
+    if (!newToken || !isValidUser(loggedInUser)) {
+      throw new Error("Invalid login response from server");
+    }
 
-    API.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(loggedInUser));
 
-    setUser(user);
-    setToken(token);
+    API.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
 
-    return user;
+    setUser(loggedInUser);
+    setToken(newToken);
+
+    return loggedInUser;
   };
 
-  // -----------------------------
-  // SIGNUP
-  // -----------------------------
-  const signup = async (username: string, email: string, password: string) => {
-    const res = await API.post("/auth/signup", {
+  const signup = async (
+    username: string,
+    email: string,
+    password: string,
+  ): Promise<User> => {
+    const res = await API.post<{ user: User }>("/auth/signup", {
       username,
       email,
       password,
     });
 
+    if (!isValidUser(res.data.user)) {
+      throw new Error("Invalid signup response from server");
+    }
+
     return res.data.user;
   };
 
-  // -----------------------------
-  // LOGOUT
-  // -----------------------------
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
+    delete API.defaults.headers.common["Authorization"];
+
     setToken(null);
     setUser(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        login,
-        signup,
-        logout,
-      }}
+      value={{ user, token, loading, login, signup, logout }}
     >
       {children}
     </AuthContext.Provider>
@@ -100,6 +139,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+
+  if (!ctx) {
+    throw new Error("useAuth must be used inside AuthProvider");
+  }
+
   return ctx;
 }

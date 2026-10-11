@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import API from "../lib/api";
 import { useAuth } from "../app/context/auth-context";
+import CommentsSection from "../components/CommentsSection";
 
 interface Group {
   id: number;
@@ -18,129 +19,145 @@ interface Group {
   userLiked?: boolean;
 }
 
-export default function Timeline() {
+interface TimelineProps {
+  selectedCategories: number[];
+}
+
+export default function Timeline({ selectedCategories }: TimelineProps) {
   const { user } = useAuth();
   const router = useRouter();
+
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --------------------------
-  // Fetch timeline
-  // --------------------------
   useEffect(() => {
+    let cancelled = false;
+
     const fetchTimeline = async () => {
+      setLoading(true);
+
       try {
-        let userInterests: number[] = [];
         let savedGroups: number[] = [];
 
         if (user) {
-          // interests
-          const interestsRes = await API.get(`api/users/${user.id}`);
-          userInterests = interestsRes.data.interests.map(
-            (i: any) => i.category_id,
-          );
-
-          // saved groups
-          const savedRes = await API.get(`/saved-groups/user/${user.id}`);
-          savedGroups = savedRes.data.map((g: any) => g.group_id);
+          const savedRes = await API.get("/saved-groups/me");
+          savedGroups = savedRes.data.map((g: any) => Number(g.group_id));
         }
 
-        // public groups
         const resGroups = await API.get("/groups/public");
 
-        const filteredGroups = user
-          ? resGroups.data.filter((g: Group) =>
-              userInterests.includes(g.category_id),
-            )
-          : resGroups.data;
+        if (cancelled) return;
 
-        // إضافة حالة الحفظ
-        const finalGroups = filteredGroups.map((g: Group) => ({
+        const publicGroups: Group[] = resGroups.data.map((g: Group) => ({
           ...g,
-          isSaved: savedGroups.includes(g.id),
+          category_id: Number(g.category_id),
+          isSaved: savedGroups.includes(Number(g.id)),
         }));
 
-        setGroups(finalGroups);
+        setGroups(publicGroups);
       } catch (err) {
-        console.error(err);
+        if (!cancelled) {
+          console.error("Failed to fetch timeline:", err);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchTimeline();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  // --------------------------
-  // Handlers
-  // --------------------------
+  const filteredGroups = useMemo(() => {
+    if (selectedCategories.length === 0) {
+      return groups;
+    }
+
+    return groups.filter((group) =>
+      selectedCategories.includes(Number(group.category_id)),
+    );
+  }, [groups, selectedCategories]);
+
   const handleLike = async (groupId: number) => {
     try {
       await API.post(`/groups/${groupId}/like`);
+
       setGroups((prev) =>
-        prev.map((g) =>
-          g.id === groupId
+        prev.map((group) =>
+          group.id === groupId
             ? {
-                ...g,
-                userLiked: !g.userLiked,
-                likesCount: g.likesCount
-                  ? g.likesCount + (g.userLiked ? -1 : 1)
-                  : 1,
+                ...group,
+                userLiked: !group.userLiked,
+                likesCount: Math.max(
+                  0,
+                  (group.likesCount || 0) + (group.userLiked ? -1 : 1),
+                ),
               }
-            : g,
+            : group,
         ),
       );
     } catch (err) {
-      console.error(err);
+      console.error("Failed to like group:", err);
     }
   };
 
   const handleSave = async (groupId: number) => {
     try {
-      await API.post(`/saved-groups/groups/${groupId}`, {
-        user_id: user?.id,
-      });
+      await API.post(`/saved-groups/groups/${groupId}`);
+
       setGroups((prev) =>
-        prev.map((g) => (g.id === groupId ? { ...g, isSaved: !g.isSaved } : g)),
+        prev.map((group) =>
+          group.id === groupId ? { ...group, isSaved: !group.isSaved } : group,
+        ),
       );
     } catch (err) {
-      console.error(err);
+      console.error("Failed to save group:", err);
     }
   };
 
   const handleComment = (groupId: number) => {
     console.log("Comment on group:", groupId);
-    // لاحقًا فتح modal للتعليقات
   };
 
-  // --------------------------
-  // Render
-  // --------------------------
-  if (loading) return <p className="p-6">Loading timeline...</p>;
-  if (groups.length === 0) return <p className="p-6">No groups to show.</p>;
+  if (loading) {
+    return <p className="p-6">Loading timeline...</p>;
+  }
+
+  if (filteredGroups.length === 0) {
+    return (
+      <p className="p-6 text-gray-500">
+        {selectedCategories.length > 0
+          ? "No groups found for the selected interests."
+          : "No groups to show."}
+      </p>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {groups.map((group) => (
+      {filteredGroups.map((group) => (
         <div
           key={group.id}
           className={`bg-white shadow rounded p-4 border-2 ${
             group.user_id === user?.id ? "border-blue-500" : "border-gray-200"
           }`}
         >
-          {/* Group Header */}
           <h2 className="text-xl font-bold">{group.title}</h2>
+
           <p className="text-gray-600 mt-1">{group.description}</p>
+
           <p className="text-sm text-gray-400 mt-1">
             By: {group.username} | Category: {group.category_name}
           </p>
 
-          {/* Actions */}
           <div className="flex justify-between mt-4 flex-wrap gap-2">
-            {/* Like + Comment يظهروا فقط إذا صاحب البوست ليس المستخدم الحالي */}
             {group.user_id !== user?.id && (
               <>
-                {/* Like */}
                 <button
                   className={`px-3 py-1 rounded ${
                     group.userLiked ? "bg-blue-500 text-white" : "bg-gray-200"
@@ -150,17 +167,15 @@ export default function Timeline() {
                   Like ({group.likesCount || 0})
                 </button>
 
-                {/* Comment */}
-                <button
+                {/* <button
                   className="px-3 py-1 bg-gray-200 rounded"
                   onClick={() => handleComment(group.id)}
                 >
                   Comment
-                </button>
+                </button> */}
               </>
             )}
 
-            {/* Save */}
             <button
               className={`px-3 py-1 rounded ${
                 group.isSaved ? "bg-green-500 text-white" : "bg-gray-200"
@@ -170,7 +185,6 @@ export default function Timeline() {
               {group.isSaved ? "Saved" : "Save"}
             </button>
 
-            {/* View */}
             <button
               className="px-3 py-1 bg-blue-600 text-white rounded"
               onClick={() => router.push(`/group/${group.id}`)}
@@ -178,6 +192,7 @@ export default function Timeline() {
               View
             </button>
           </div>
+          <CommentsSection groupId={group.id} />
         </div>
       ))}
     </div>

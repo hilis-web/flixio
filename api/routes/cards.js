@@ -1,20 +1,32 @@
 const express = require("express");
 const router = express.Router();
+
 const cardsController = require("../controllers/cardsController");
+const authMiddleware = require("../middleware/authMiddleware");
+const optionalAuthMiddleware = require("../middleware/optionalAuthMiddleware");
 
-// Get all cards in a group
-router.get("/group/:groupId", cardsController.getCardsByGroup);
+// Get cards in a group
+// Public groups are available to everyone; private groups require ownership.
+router.get(
+  "/group/:groupId",
+  optionalAuthMiddleware,
+  cardsController.getCardsByGroup,
+);
 
-// Get a card in a group
-router.get("/:cardId", cardsController.getCardsByCardId);
+// Get a single card
+router.get(
+  "/:cardId",
+  optionalAuthMiddleware,
+  cardsController.getCardsByCardId,
+);
 
-// Create card
-router.post("/", cardsController.createCard);
+// Create a card — authenticated user only
+router.post("/", authMiddleware, cardsController.createCard);
 
-// Update card
-router.put("/:cardId", cardsController.updateCard);
+// Update a card — authenticated user only
+router.put("/:cardId", authMiddleware, cardsController.updateCard);
 
-// Delete card
-router.delete("/:cardId", cardsController.deleteCard);
+// Delete a card — authenticated user only
+router.delete("/:cardId", authMiddleware, cardsController.deleteCard);
 
 module.exports = router;
