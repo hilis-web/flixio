@@ -43,6 +43,7 @@ export default function SignupPage() {
 
         <input
           type="email"
+          autoComplete="email"
           placeholder="Email"
           className="w-full p-2 border mb-3 rounded"
           onChange={(e) => setEmail(e.target.value)}

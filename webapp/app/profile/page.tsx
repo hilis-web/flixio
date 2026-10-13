@@ -109,6 +109,7 @@ export default function UserProfilePage() {
         <label className="block mb-1 font-semibold">Email</label>
         <input
           type="email"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="border p-2 w-full rounded"
