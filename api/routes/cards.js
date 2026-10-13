@@ -13,6 +13,9 @@ router.get(
   cardsController.getCardsByGroup,
 );
 
+// Create multiple cards in one transaction
+router.post("/bulk", authMiddleware, cardsController.createBulkCards);
+
 // Get a single card
 router.get(
   "/:cardId",

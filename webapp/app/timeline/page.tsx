@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import API from "../../lib/api";
 import { useAuth } from "../context/auth-context";
 import CommentsSection from "../../components/CommentsSection";
+
 interface Group {
   id: number;
   title: string;
@@ -32,45 +33,81 @@ export default function TimelinePage() {
   const [interests, setInterests] = useState<Interest[]>([]);
   const [activeFilters, setActiveFilters] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingGroupIds, setSavingGroupIds] = useState<number[]>([]);
+  const [pageError, setPageError] = useState("");
 
-  // Fetch public groups and saved user interests
   useEffect(() => {
     let cancelled = false;
 
     const fetchTimeline = async () => {
       setLoading(true);
+      setPageError("");
 
       try {
-        const [groupsRes, interestsRes] = await Promise.all([
-          API.get("/groups/public"),
-          user ? API.get("/api/users/me") : Promise.resolve(null),
-        ]);
+        const groupsRes = await API.get("/groups/public");
 
         if (cancelled) return;
 
         const publicGroups: Group[] = groupsRes.data;
-        setAllGroups(publicGroups);
 
-        if (user && interestsRes) {
-          const savedInterests: Interest[] = interestsRes.data.interests.map(
-            (item: any) => ({
-              category_id: Number(item.category_id),
-              name: item.name,
-            }),
-          );
+        let savedGroupIds = new Set<number>();
 
-          setInterests(savedInterests);
+        if (user) {
+          const [interestsResult, savedResult] = await Promise.allSettled([
+            API.get("/api/users/me"),
+            API.get("/saved-groups/me"),
+          ]);
 
-          // Initially show posts from all saved interests
-          setActiveFilters(savedInterests.map((item) => item.category_id));
+          if (cancelled) return;
+
+          if (interestsResult.status === "fulfilled") {
+            const rawInterests = interestsResult.value.data.interests || [];
+
+            const savedInterests: Interest[] = rawInterests.map(
+              (item: any) => ({
+                category_id: Number(item.category_id),
+                name: item.name,
+              }),
+            );
+
+            setInterests(savedInterests);
+            setActiveFilters(savedInterests.map((item) => item.category_id));
+          } else {
+            console.error("Failed to load interests:", interestsResult.reason);
+            setInterests([]);
+            setActiveFilters([]);
+          }
+
+          if (savedResult.status === "fulfilled") {
+            savedGroupIds = new Set<number>(
+              (savedResult.value.data || []).map(
+                (item: { group_id: number | string }) => Number(item.group_id),
+              ),
+            );
+          } else {
+            console.error("Failed to load saved groups:", savedResult.reason);
+          }
         } else {
           setInterests([]);
           setActiveFilters([]);
         }
+
+        const groupsWithSavedState = publicGroups.map((group) => ({
+          ...group,
+          isSaved: savedGroupIds.has(Number(group.id)),
+        }));
+
+        setAllGroups(groupsWithSavedState);
       } catch (err) {
         console.error("Failed to load timeline:", err);
+
+        if (!cancelled) {
+          setPageError("Could not load groups. Please try again.");
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
@@ -81,7 +118,6 @@ export default function TimelinePage() {
     };
   }, [user]);
 
-  // Apply temporary timeline filters only
   useEffect(() => {
     if (activeFilters.length === 0) {
       setGroups(allGroups);
@@ -95,7 +131,6 @@ export default function TimelinePage() {
     );
   }, [allGroups, activeFilters]);
 
-  // Toggle a temporary filter; does not update the database
   const toggleFilter = (categoryId: number) => {
     setActiveFilters((previous) =>
       previous.includes(categoryId)
@@ -107,7 +142,6 @@ export default function TimelinePage() {
   const handleLike = async (groupId: number) => {
     try {
       const response = await API.post(`/groups/${groupId}/like`);
-
       const { liked, likesCount } = response.data;
 
       const updateGroup = (group: Group): Group =>
@@ -119,27 +153,33 @@ export default function TimelinePage() {
             }
           : group;
 
-      // Update the original list used by the filters
       setAllGroups((previous) => previous.map(updateGroup));
-
-      // Update the currently displayed list
-      setGroups((previous) => previous.map(updateGroup));
     } catch (err) {
       console.error("Failed to update like:", err);
+      alert("Could not update the like. Please try again.");
     }
   };
 
   const handleSave = async (groupId: number) => {
-    try {
-      await API.post(`/saved-groups/groups/${groupId}`);
+    if (!user || savingGroupIds.includes(groupId)) return;
 
-      setGroups((previous) =>
+    setSavingGroupIds((previous) => [...previous, groupId]);
+
+    try {
+      const response = await API.post(`/saved-groups/groups/${groupId}`);
+
+      const isSaved = Boolean(response.data.saved);
+
+      setAllGroups((previous) =>
         previous.map((group) =>
-          group.id === groupId ? { ...group, isSaved: !group.isSaved } : group,
+          group.id === groupId ? { ...group, isSaved } : group,
         ),
       );
     } catch (err) {
-      console.error(err);
+      console.error("Failed to update saved group:", err);
+      alert("Could not update the saved group. Please try again.");
+    } finally {
+      setSavingGroupIds((previous) => previous.filter((id) => id !== groupId));
     }
   };
 
@@ -147,9 +187,23 @@ export default function TimelinePage() {
     return <p className="p-6">Loading timeline...</p>;
   }
 
+  if (pageError) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-600 mb-3">{pageError}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-blue-600 text-white rounded"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6">
-      {/* Temporary interest filters */}
       {user && interests.length > 0 && (
         <section className="bg-white border rounded-lg p-4">
           <h2 className="font-bold text-lg mb-3">Filter by interest</h2>
@@ -208,6 +262,7 @@ export default function TimelinePage() {
 
             <div className="flex justify-between mt-4 flex-wrap gap-2">
               <button
+                type="button"
                 className={`px-3 py-1 rounded ${
                   group.userLiked ? "bg-blue-500 text-white" : "bg-gray-200"
                 }`}
@@ -216,24 +271,25 @@ export default function TimelinePage() {
                 Like ({group.likesCount || 0})
               </button>
 
-              {/* <button
-                type="button"
-                className="px-3 py-1 bg-gray-200 rounded"
-                onClick={() => router.push(`/group/${group.id}?comments=open`)}
-              >
-                Comment
-              </button> */}
-
               <button
-                className={`px-3 py-1 rounded ${
+                type="button"
+                disabled={!user || savingGroupIds.includes(group.id)}
+                className={`px-3 py-1 rounded disabled:opacity-50 ${
                   group.isSaved ? "bg-green-500 text-white" : "bg-gray-200"
                 }`}
                 onClick={() => handleSave(group.id)}
               >
-                {group.isSaved ? "Saved" : "Save"}
+                {!user
+                  ? "Log in to save"
+                  : savingGroupIds.includes(group.id)
+                    ? "Saving..."
+                    : group.isSaved
+                      ? "Saved"
+                      : "Save"}
               </button>
 
               <button
+                type="button"
                 className="px-3 py-1 bg-blue-600 text-white rounded"
                 onClick={() => router.push(`/group/${group.id}`)}
               >

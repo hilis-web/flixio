@@ -6,7 +6,10 @@ import Timeline from "../../components/Timeline";
 import Discovery from "../../components/Discovery";
 import Footer from "../../components/Footer";
 import SearchBar from "../../components/SearchBar";
-
+import DailyReview from "../../components/DailyReview";
+import ReviewStatistics from "../../components/ReviewStatistics";
+import DailyLearningGoal from "../../components/DailyLearningGoal";
+import LearningStreak from "../../components/LearningStreak";
 export default function Feed() {
   const [activeTab, setActiveTab] = useState<"timeline" | "discovery">(
     "timeline",
@@ -25,6 +28,13 @@ export default function Feed() {
           <div className="sticky top-6 z-20 bg-white rounded-xl border p-4 shadow-md">
             <SearchBar />
           </div>
+
+          {/* Daily Spaced Repetition Review */}
+
+          <DailyReview />
+          <DailyLearningGoal />
+          <LearningStreak />
+          <ReviewStatistics />
 
           <div className="bg-white rounded-xl border shadow-md overflow-hidden">
             <div className="flex justify-center border-b bg-gray-50">

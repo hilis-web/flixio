@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import API from "../../lib/api";
 import { useAuth } from "../context/auth-context";
-
+import StudyReminders from "../../components/StudyReminders";
 interface Category {
   id: number;
   name: string;
@@ -134,7 +134,10 @@ export default function UserProfilePage() {
           ))}
         </div>
       </div>
-
+      {/* Study Reminders */}
+      <div className="mt-8">
+        <StudyReminders />
+      </div>
       <button
         className="bg-green-600 text-white px-4 py-2 rounded"
         onClick={handleSave}

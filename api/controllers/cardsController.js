@@ -159,6 +159,113 @@ module.exports = {
     }
   },
 
+  createBulkCards: async (req, res) => {
+    let client;
+
+    try {
+      const userId = req.user.id;
+      const groupId = Number(req.body.group_id);
+      const cards = req.body.cards;
+
+      if (!Number.isInteger(groupId) || groupId <= 0) {
+        return res.status(400).json({
+          error: "Invalid group_id",
+        });
+      }
+
+      if (!Array.isArray(cards) || cards.length === 0 || cards.length > 100) {
+        return res.status(400).json({
+          error: "Provide between 1 and 100 cards",
+        });
+      }
+
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+
+        if (
+          !card ||
+          typeof card.front_text !== "string" ||
+          !card.front_text.trim() ||
+          typeof card.back_text !== "string" ||
+          !card.back_text.trim()
+        ) {
+          return res.status(400).json({
+            error: `Invalid front or back text in card ${i + 1}`,
+          });
+        }
+      }
+
+      client = await pool.connect();
+
+      await client.query("BEGIN");
+
+      const groupResult = await client.query(
+        `SELECT id
+         FROM card_groups
+         WHERE id = $1 AND user_id = $2`,
+        [groupId, userId],
+      );
+
+      if (groupResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+
+        const existingGroup = await pool.query(
+          `SELECT id FROM card_groups WHERE id = $1`,
+          [groupId],
+        );
+
+        if (existingGroup.rowCount === 0) {
+          return res.status(404).json({
+            error: "Group not found",
+          });
+        }
+
+        return res.status(403).json({
+          error: "You are not allowed to add cards to this group",
+        });
+      }
+
+      const savedCards = [];
+
+      for (const card of cards) {
+        const result = await client.query(
+          `INSERT INTO cards (group_id, front_text, back_text)
+           VALUES ($1, $2, $3)
+           RETURNING *`,
+          [groupId, card.front_text.trim(), card.back_text.trim()],
+        );
+
+        savedCards.push(result.rows[0]);
+      }
+
+      await client.query("COMMIT");
+
+      return res.status(201).json({
+        message: "Cards created successfully",
+        count: savedCards.length,
+        cards: savedCards,
+      });
+    } catch (err) {
+      if (client) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          console.error("Bulk card rollback error:", rollbackError.message);
+        }
+      }
+
+      console.error("Create bulk cards error:", err.message);
+
+      return res.status(500).json({
+        error: "Failed to create cards",
+      });
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  },
+
   // ------------------------
   // Update card
   // ------------------------

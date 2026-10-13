@@ -43,7 +43,16 @@ export default function MyGroups() {
       <h1 className="text-3xl font-bold mb-6">My Groups</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         {groups.map((group) => (
-          <GroupCard key={group.id} group={group} editable />
+          <GroupCard
+            key={group.id}
+            group={group}
+            editable
+            onDeleted={(groupId) => {
+              setGroups((previous) =>
+                previous.filter((item) => item.id !== groupId),
+              );
+            }}
+          />
         ))}
       </div>
     </div>

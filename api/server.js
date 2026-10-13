@@ -39,10 +39,14 @@ app.use("/auth", require("./routes/auth"));
 app.use("/categories", require("./routes/categories"));
 app.use("/groups", require("./routes/groups"));
 app.use("/cards", require("./routes/cards"));
+app.use("/api/reviews", require("./routes/reviews"));
 app.use("/comments", require("./routes/comments"));
 app.use("/saved-groups", require("./routes/savedGroups"));
 app.use("/api/interests", require("./routes/interests"));
 app.use("/api/users", require("./routes/users"));
+
+app.use("/api/daily-goal", require("./routes/dailyGoal"));
+app.use("/api/study-reminders", require("./routes/studyReminders"));
 
 // -----------------------------
 // Test routes
