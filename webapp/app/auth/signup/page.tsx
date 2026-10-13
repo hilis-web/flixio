@@ -50,6 +50,8 @@ export default function SignupPage() {
 
         <input
           type="password"
+          name="password"
+          autoComplete="current-password"
           placeholder="Password"
           className="w-full p-2 border mb-3 rounded"
           onChange={(e) => setPassword(e.target.value)}
