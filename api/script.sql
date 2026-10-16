@@ -154,3 +154,74 @@ CREATE TABLE IF NOT EXISTS study_reminders (
 CREATE INDEX IF NOT EXISTS idx_study_reminders_enabled
 ON study_reminders(enabled)
 WHERE enabled = TRUE;
+
+-- ///////////////////
+
+CREATE TABLE IF NOT EXISTS follows (
+    id BIGSERIAL PRIMARY KEY,
+
+    follower_id INTEGER NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+
+    following_id INTEGER NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT unique_follow_pair
+        UNIQUE (follower_id, following_id),
+
+    CONSTRAINT prevent_self_follow
+        CHECK (follower_id <> following_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_follows_follower_id
+    ON follows (follower_id);
+
+CREATE INDEX IF NOT EXISTS idx_follows_following_id
+    ON follows (following_id);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGSERIAL PRIMARY KEY,
+    recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    type VARCHAR(30) NOT NULL
+        CHECK (type IN ('follow', 'like', 'comment')),
+    entity_id BIGINT,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created
+ON notifications (recipient_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_unread
+ON notifications (recipient_id, is_read)
+WHERE is_read = FALSE;
+
+
+ALTER TABLE comments
+ADD COLUMN parent_comment_id INTEGER
+REFERENCES comments(id)
+ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_comments_parent_comment_id
+ON comments(parent_comment_id);
+
+
+CREATE TABLE IF NOT EXISTS comment_likes (
+    id BIGSERIAL PRIMARY KEY,
+    comment_id INTEGER NOT NULL
+        REFERENCES comments(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (comment_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_comment_likes_comment_id
+ON comment_likes(comment_id);
+
+CREATE INDEX IF NOT EXISTS idx_comment_likes_user_id
+ON comment_likes(user_id);

@@ -20,6 +20,7 @@ router.put("/:groupId", authMiddleware, groupsController.updateGroup);
 // Delete group — authenticated owner only
 router.delete("/:groupId", authMiddleware, groupsController.deleteGroup);
 
+router.get("/following", authMiddleware, groupsController.getFollowingGroups);
 // Get single group + cards — visibility protection comes next
 router.get(
   "/:groupId",

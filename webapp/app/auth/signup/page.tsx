@@ -17,8 +17,7 @@ export default function SignupPage() {
     e.preventDefault();
     try {
       const user = await signup(username, email, password);
-      alert("Signup successful! Please login.");
-      //router.push("/auth/login"); // بعد التسجيل نوجهه لصفحة login
+      // signup creates an authenticated session; continue to interest selection.
       router.push("/interests");
     } catch (err) {
       alert("Signup failed, check your inputs.");

@@ -1,6 +1,7 @@
 const pool = require("../db");
 
 // Toggle like for a group
+
 exports.toggleLike = async (req, res) => {
   const userId = req.user.id;
   const groupId = Number(req.params.groupId);
@@ -12,9 +13,9 @@ exports.toggleLike = async (req, res) => {
   }
 
   try {
-    // Check that the group exists and is accessible
+    // Get the group owner and check accessibility
     const groupResult = await pool.query(
-      `SELECT id
+      `SELECT id, user_id
        FROM card_groups
        WHERE id = $1
          AND (is_public = TRUE OR user_id = $2)`,
@@ -26,6 +27,8 @@ exports.toggleLike = async (req, res) => {
         message: "Group not found",
       });
     }
+
+    const groupOwnerId = groupResult.rows[0].user_id;
 
     // Remove an existing like; otherwise create one
     const result = await pool.query(
@@ -47,6 +50,19 @@ exports.toggleLike = async (req, res) => {
       [userId, groupId],
     );
 
+    const liked = result.rows[0].liked;
+
+    // Notify the owner only when a new like is created.
+    // Do not notify users about likes on their own groups.
+    if (liked && Number(groupOwnerId) !== Number(userId)) {
+      await pool.query(
+        `INSERT INTO notifications
+          (recipient_id, actor_id, type, entity_id, message)
+         VALUES ($1, $2, 'like', $3, $4)`,
+        [groupOwnerId, userId, groupId, "liked your group"],
+      );
+    }
+
     const countResult = await pool.query(
       `SELECT COUNT(*)::int AS likes_count
        FROM group_likes
@@ -55,7 +71,7 @@ exports.toggleLike = async (req, res) => {
     );
 
     return res.status(200).json({
-      liked: result.rows[0].liked,
+      liked,
       likesCount: countResult.rows[0].likes_count,
     });
   } catch (error) {

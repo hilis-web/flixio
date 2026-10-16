@@ -29,12 +29,12 @@ export default function InterestsPage() {
         const catsRes = await API.get("/api/interests/categories");
         setCategories(catsRes.data);
 
-        const userRes = await API.get(`/api/interests/user/${user.id}`);
-        await API.post("/api/interests/save", {
-          user_id: user?.id,
-          category_ids: selected,
-        });
-        setSelected(userRes.data);
+        const userRes = await API.get("/api/users/me");
+        setSelected(
+          userRes.data.interests.map((item: { category_id: number }) =>
+            Number(item.category_id),
+          ),
+        );
       } catch (err) {
         console.error(err);
       }
@@ -61,12 +61,11 @@ export default function InterestsPage() {
   // --------------------------
   const saveInterests = async () => {
     try {
-      await API.post("api/interests/save", {
-        user_id: user?.id,
-        category_ids: selected,
+      await API.put("/api/users/me/interests", {
+        interests: selected,
       });
 
-      router.push("/"); // go to timeline
+      router.push("/feeds");
     } catch (err) {
       console.error(err);
       alert("Failed to save interests");
@@ -86,7 +85,8 @@ export default function InterestsPage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
         {categories.map((cat) => (
-          <div
+          <button
+            type="button"
             key={cat.id}
             onClick={() => toggleCategory(cat.id)}
             className={`p-4 rounded-lg cursor-pointer text-center border transition ${
@@ -96,7 +96,7 @@ export default function InterestsPage() {
             }`}
           >
             {cat.name}
-          </div>
+          </button>
         ))}
       </div>
 

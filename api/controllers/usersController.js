@@ -45,12 +45,29 @@ const updateUserProfile = async (req, res) => {
 
   if (
     typeof username !== "string" ||
-    !username.trim() ||
     typeof email !== "string" ||
+    !username.trim() ||
     !email.trim()
   ) {
     return res.status(400).json({
       error: "Valid username and email are required",
+    });
+  }
+
+  const cleanUsername = username.trim();
+  const cleanEmail = email.trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Match the actual database column limits and signup's email format.
+  if (cleanUsername.length < 2 || cleanUsername.length > 50) {
+    return res.status(400).json({
+      error: "Username must be between 2 and 50 characters",
+    });
+  }
+
+  if (cleanEmail.length > 100 || !emailRegex.test(cleanEmail)) {
+    return res.status(400).json({
+      error: "Please provide a valid email address",
     });
   }
 
@@ -60,7 +77,7 @@ const updateUserProfile = async (req, res) => {
        SET username = $1, email = $2
        WHERE id = $3
        RETURNING id, username, email, created_at`,
-      [username.trim(), email.trim(), userId],
+      [cleanUsername, cleanEmail, userId],
     );
 
     if (result.rowCount === 0) {
@@ -171,4 +188,44 @@ const updateUserInterests = async (req, res) => {
   }
 };
 
-module.exports = { getUserProfile, updateUserProfile, updateUserInterests };
+const getPublicUserProfile = async (req, res) => {
+  const userId = Number(req.params.id);
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({
+      message: "Invalid user ID",
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT id, username
+       FROM users
+       WHERE id = $1`,
+      [userId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      user: result.rows[0],
+    });
+  } catch (error) {
+    console.error("getPublicUserProfile error:", error);
+
+    return res.status(500).json({
+      message: "Failed to load user profile",
+    });
+  }
+};
+
+module.exports = {
+  getUserProfile,
+  updateUserProfile,
+  updateUserInterests,
+  getPublicUserProfile,
+};

@@ -8,11 +8,14 @@
 // export default API;
 
 import axios from "axios";
+// const API = axios.create({
+// baseURL:
+// process.env.NEXT_PUBLIC_API_URL ||
+// "http://localhost:5000",
+// });
 
 const API = axios.create({
-  baseURL:
-    //process.env.NEXT_PUBLIC_API_URL ||
-    "https://flixio-h9fc.onrender.com",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
 });
 
 // Attach the latest token to every request when available.

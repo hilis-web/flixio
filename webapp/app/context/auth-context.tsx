@@ -105,17 +105,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
   ): Promise<User> => {
-    const res = await API.post<{ user: User }>("/auth/signup", {
+    const res = await API.post<AuthResponse>("/auth/signup", {
       username,
       email,
       password,
     });
 
-    if (!isValidUser(res.data.user)) {
+    const { token: newToken, user: newUser } = res.data;
+    if (!newToken || !isValidUser(newUser)) {
       throw new Error("Invalid signup response from server");
     }
 
-    return res.data.user;
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(newUser));
+    API.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
+    setToken(newToken);
+    setUser(newUser);
+
+    return newUser;
   };
 
   const logout = () => {

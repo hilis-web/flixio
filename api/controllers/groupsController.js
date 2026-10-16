@@ -52,6 +52,48 @@ module.exports = {
     }
   },
 
+  // Get public groups from accounts the current user follows
+  getFollowingGroups: async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      const result = await pool.query(
+        `
+    SELECT
+      cg.*,
+      u.username,
+      c.name AS category_name,
+      COUNT(DISTINCT gl.id)::int AS "likesCount",
+      COALESCE(
+        BOOL_OR(gl.user_id = $1),
+        FALSE
+      ) AS "userLiked"
+    FROM card_groups cg
+    JOIN users u ON u.id = cg.user_id
+    JOIN categories c ON c.id = cg.category_id
+    LEFT JOIN group_likes gl ON gl.group_id = cg.id
+    WHERE cg.is_public = TRUE
+      AND EXISTS (
+        SELECT 1
+        FROM follows f
+        WHERE f.follower_id = $1
+          AND f.following_id = cg.user_id
+      )
+    GROUP BY cg.id, u.username, c.name
+    ORDER BY cg.created_at DESC
+    `,
+        [userId],
+      );
+
+      return res.json(result.rows);
+    } catch (err) {
+      console.error("Failed to load following feed:", err);
+      return res.status(500).json({
+        error: "Failed to load following feed",
+      });
+    }
+  },
+
   // ------------------------------------------
   // Create a new group
   // ------------------------------------------
@@ -120,7 +162,11 @@ module.exports = {
   // ------------------------------------------
   getGroupWithCards: async (req, res) => {
     try {
-      const { groupId } = req.params;
+      const groupId = Number(req.params.groupId);
+
+      if (!Number.isInteger(groupId) || groupId <= 0) {
+        return res.status(400).json({ error: "Invalid group ID" });
+      }
 
       // group info
       const group = await pool.query(

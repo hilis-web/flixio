@@ -15,6 +15,7 @@ const pool = require("./db");
 
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://192.168.1.36:3000",
   "http://192.168.1.33:3000",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
@@ -44,10 +45,12 @@ app.use("/comments", require("./routes/comments"));
 app.use("/saved-groups", require("./routes/savedGroups"));
 app.use("/api/interests", require("./routes/interests"));
 app.use("/api/users", require("./routes/users"));
+app.use("/api/follows", require("./routes/follows"));
 
 app.use("/api/daily-goal", require("./routes/dailyGoal"));
 app.use("/api/study-reminders", require("./routes/studyReminders"));
 
+app.use("/api/notifications", require("./routes/notifications"));
 // -----------------------------
 // Test routes
 // -----------------------------

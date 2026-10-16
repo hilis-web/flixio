@@ -1,7 +1,9 @@
 const express = require("express");
+
 const router = express.Router();
 
 const commentsController = require("../controllers/commentsController");
+
 const authMiddleware = require("../middleware/authMiddleware");
 const optionalAuthMiddleware = require("../middleware/optionalAuthMiddleware");
 
@@ -14,6 +16,13 @@ router.get(
 
 // Add a comment — authentication required
 router.post("/", authMiddleware, commentsController.addComment);
+
+// Like or unlike a comment/reply — authentication required
+router.post(
+  "/:commentId/like",
+  authMiddleware,
+  commentsController.toggleCommentLike,
+);
 
 // Delete a comment — authentication required
 router.delete("/:commentId", authMiddleware, commentsController.deleteComment);

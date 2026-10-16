@@ -7,7 +7,7 @@ module.exports = {
   getAllCategories: async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT * FROM categories ORDER BY id ASC`
+        `SELECT * FROM categories ORDER BY id ASC`,
       );
       res.json(result.rows);
     } catch (err) {
@@ -20,41 +20,20 @@ module.exports = {
   // Create a new category
   // -------------------------
   createCategory: async (req, res) => {
-    try {
-      const { name } = req.body;
-
-      if (!name) {
-        return res.status(400).json({ error: "Category name is required" });
-      }
-
-      const result = await pool.query(
-        `INSERT INTO categories (name) VALUES ($1) RETURNING *`,
-        [name]
-      );
-
-      res.json({
-        message: "Category created",
-        category: result.rows[0],
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to create category" });
-    }
+    // No admin role/permission model exists in the current users schema.
+    // Fail closed until category administration can be restricted to admins.
+    return res.status(403).json({
+      error: "Category management requires admin permissions",
+    });
   },
 
   // -------------------------
   // Delete category
   // -------------------------
   deleteCategory: async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      await pool.query(`DELETE FROM categories WHERE id = $1`, [id]);
-
-      res.json({ message: "Category deleted successfully" });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to delete category" });
-    }
+    // No admin role/permission model exists in the current users schema.
+    return res.status(403).json({
+      error: "Category management requires admin permissions",
+    });
   },
 };

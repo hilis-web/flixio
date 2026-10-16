@@ -50,6 +50,14 @@ module.exports = {
         });
       }
 
+      // Fail before creating the account if we cannot establish its session.
+      if (!process.env.JWT_SECRET) {
+        console.error("JWT_SECRET is not configured");
+        return res.status(500).json({
+          error: "Authentication service is not configured",
+        });
+      }
+
       // Hash password before saving
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -60,9 +68,17 @@ module.exports = {
         [cleanUsername, cleanEmail, hashedPassword],
       );
 
+      // Create a session immediately after registration so the user can
+      // continue to the interests onboarding without signing in again.
+      const user = result.rows[0];
+      const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES || "7d",
+      });
+
       return res.status(201).json({
         message: "User created successfully",
-        user: result.rows[0],
+        token,
+        user,
       });
     } catch (err) {
       // PostgreSQL unique constraint violation
@@ -100,7 +116,15 @@ module.exports = {
 
       const cleanEmail = email.trim().toLowerCase();
 
-      if (cleanEmail.length > 254) {
+      // Signup accepts passwords up to 128 characters. Apply the same bound
+      // at login to avoid unnecessarily expensive comparisons on huge inputs.
+      if (password.length > 128) {
+        return res.status(400).json({
+          error: "Invalid email or password",
+        });
+      }
+
+      if (cleanEmail.length > 100) {
         return res.status(400).json({
           error: "Invalid email or password",
         });

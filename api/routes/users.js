@@ -16,5 +16,5 @@ router.put(
   authMiddleware,
   usersController.updateUserInterests,
 );
-
+router.get("/:id", usersController.getPublicUserProfile);
 module.exports = router;

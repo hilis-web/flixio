@@ -10,11 +10,11 @@ import DailyReview from "../../components/DailyReview";
 import ReviewStatistics from "../../components/ReviewStatistics";
 import DailyLearningGoal from "../../components/DailyLearningGoal";
 import LearningStreak from "../../components/LearningStreak";
+import Following from "../../components/Following";
 export default function Feed() {
-  const [activeTab, setActiveTab] = useState<"timeline" | "discovery">(
-    "timeline",
-  );
-
+  const [activeTab, setActiveTab] = useState<
+    "timeline" | "following" | "discovery"
+  >("timeline");
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
 
   return (
@@ -48,7 +48,16 @@ export default function Feed() {
               >
                 Timeline
               </button>
-
+              <button
+                className={`px-6 py-3 font-medium ${
+                  activeTab === "following"
+                    ? "border-b-2 border-blue-600 text-blue-600"
+                    : "text-gray-500"
+                }`}
+                onClick={() => setActiveTab("following")}
+              >
+                Following
+              </button>
               <button
                 className={`px-6 py-3 font-medium ${
                   activeTab === "discovery"
@@ -65,7 +74,9 @@ export default function Feed() {
               {activeTab === "timeline" && (
                 <Timeline selectedCategories={selectedCategories} />
               )}
-
+              {activeTab === "following" && (
+                <Following selectedCategories={selectedCategories} />
+              )}
               {activeTab === "discovery" && <Discovery />}
             </div>
           </div>

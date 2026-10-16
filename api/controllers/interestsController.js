@@ -5,35 +5,61 @@ module.exports = {
   // حفظ اهتمامات المستخدم (اختيار الفئات)
   // ------------------------------------------------
   saveUserInterests: async (req, res) => {
+    const userId = req.user.id;
+    const { category_ids: categoryIds } = req.body || {};
+
+    if (!Array.isArray(categoryIds)) {
+      return res.status(400).json({ error: "category_ids must be an array" });
+    }
+
+    const normalizedIds = categoryIds.map(Number);
+    if (normalizedIds.some((id) => !Number.isInteger(id) || id <= 0)) {
+      return res.status(400).json({ error: "Invalid category IDs" });
+    }
+    const uniqueIds = [...new Set(normalizedIds)];
+
+    let client;
     try {
-      console.log("saveUserInterests");
-      const { user_id, category_ids } = req.body;
-
-      if (!user_id || !Array.isArray(category_ids)) {
-        return res
-          .status(400)
-          .json({ error: "user_id and category_ids required" });
+      client = await pool.connect();
+      if (uniqueIds.length) {
+        const categories = await client.query(
+          "SELECT id FROM categories WHERE id = ANY($1::int[])",
+          [uniqueIds],
+        );
+        if (categories.rowCount !== uniqueIds.length) {
+          return res
+            .status(400)
+            .json({ error: "One or more categories do not exist" });
+        }
       }
 
-      // حذف الاهتمامات السابقة قبل حفظ الجديدة
-      await pool.query(`DELETE FROM user_interests WHERE user_id = $1`, [
-        user_id,
+      await client.query("BEGIN");
+      await client.query("DELETE FROM user_interests WHERE user_id = $1", [
+        userId,
       ]);
-
-      // إدخال الاهتمامات الجديدة
-      const insertQuery = `
-        INSERT INTO user_interests (user_id, category_id)
-        VALUES ($1, $2)
-      `;
-
-      for (const categoryId of category_ids) {
-        await pool.query(insertQuery, [user_id, categoryId]);
+      for (const categoryId of uniqueIds) {
+        await client.query(
+          "INSERT INTO user_interests (user_id, category_id) VALUES ($1, $2)",
+          [userId, categoryId],
+        );
       }
-
-      res.json({ message: "Interests saved successfully" });
+      await client.query("COMMIT");
+      return res.json({
+        message: "Interests saved successfully",
+        interests: uniqueIds,
+      });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to save interests" });
+      if (client) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          console.error("Interests rollback error:", rollbackError.message);
+        }
+      }
+      console.error("Save interests error:", err.message);
+      return res.status(500).json({ error: "Failed to save interests" });
+    } finally {
+      if (client) client.release();
     }
   },
 
@@ -43,6 +69,11 @@ module.exports = {
   getUserInterests: async (req, res) => {
     try {
       const { userId } = req.params;
+      if (String(userId) !== String(req.user.id)) {
+        return res
+          .status(403)
+          .json({ error: "You can only access your own interests" });
+      }
 
       const result = await pool.query(
         `
@@ -50,7 +81,7 @@ module.exports = {
         FROM user_interests
         WHERE user_id = $1
       `,
-        [userId]
+        [userId],
       );
 
       res.json(result.rows.map((r) => r.category_id));

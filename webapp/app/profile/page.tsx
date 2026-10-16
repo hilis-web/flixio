@@ -20,6 +20,8 @@ export default function UserProfilePage() {
   const [email, setEmail] = useState("");
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   // --------------------------
   // Fetch user info + interests + all categories
@@ -30,6 +32,12 @@ export default function UserProfilePage() {
     const fetchData = async () => {
       try {
         const res = await API.get("/api/users/me");
+        const countsRes = await API.get(
+          `/api/follows/${res.data.user.id}/counts`,
+        );
+
+        setFollowersCount(countsRes.data.followersCount);
+        setFollowingCount(countsRes.data.followingCount);
         setUsername(res.data.user.username);
         setEmail(res.data.user.email);
         // فقط فئات صالحة
@@ -93,6 +101,17 @@ export default function UserProfilePage() {
     <div className="max-w-xl mx-auto p-6 bg-white rounded shadow">
       <h1 className="text-2xl font-bold mb-4">My Profile</h1>
 
+      <div className="flex gap-6 mb-6">
+        <div>
+          <span className="font-bold">{followersCount}</span>{" "}
+          <span className="text-gray-600">Followers</span>
+        </div>
+
+        <div>
+          <span className="font-bold">{followingCount}</span>{" "}
+          <span className="text-gray-600">Following</span>
+        </div>
+      </div>
       {/* Username */}
       <div className="mb-4">
         <label className="block mb-1 font-semibold">Username</label>

@@ -9,8 +9,11 @@ interface Comment {
   user_id: number;
   group_id: number;
   content: string;
+  parent_comment_id: number | null;
   created_at: string;
   username?: string;
+  likesCount?: number;
+  userLiked?: boolean;
 }
 
 interface CommentsSectionProps {
@@ -26,10 +29,12 @@ export default function CommentsSection({
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [content, setContent] = useState("");
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [likingIds, setLikingIds] = useState<number[]>([]);
   const [error, setError] = useState("");
 
   const loadComments = useCallback(async () => {
@@ -47,7 +52,6 @@ export default function CommentsSection({
     }
   }, [groupId]);
 
-  // Load comments on mount so the count and first comment are visible.
   useEffect(() => {
     void loadComments();
   }, [loadComments]);
@@ -66,19 +70,17 @@ export default function CommentsSection({
       const response = await API.post("/comments", {
         group_id: groupId,
         content: trimmedContent,
+        parent_comment_id: replyTo?.id ?? null,
       });
 
-      // Show the new comment immediately.
       if (response.data.comment) {
-        setComments((previous) => [
-          ...previous,
-          response.data.comment as Comment,
-        ]);
+        setComments((previous) => [...previous, response.data.comment]);
       } else {
         await loadComments();
       }
 
       setContent("");
+      setReplyTo(null);
       setIsOpen(true);
     } catch (err: any) {
       console.error("Failed to add comment:", err);
@@ -88,6 +90,37 @@ export default function CommentsSection({
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleLike = async (comment: Comment) => {
+    if (!user || likingIds.includes(comment.id)) return;
+
+    setLikingIds((previous) => [...previous, comment.id]);
+    setError("");
+
+    try {
+      const response = await API.post(`/comments/${comment.id}/like`);
+
+      setComments((previous) =>
+        previous.map((item) =>
+          item.id === comment.id
+            ? {
+                ...item,
+                userLiked: response.data.liked,
+                likesCount: response.data.likesCount,
+              }
+            : item,
+        ),
+      );
+    } catch (err: any) {
+      console.error("Failed to like comment:", err);
+      setError(
+        err?.response?.data?.error ||
+          "Could not update your like. Please try again.",
+      );
+    } finally {
+      setLikingIds((previous) => previous.filter((id) => id !== comment.id));
     }
   };
 
@@ -105,8 +138,15 @@ export default function CommentsSection({
       await API.delete(`/comments/${commentId}`);
 
       setComments((previous) =>
-        previous.filter((comment) => comment.id !== commentId),
+        previous.filter(
+          (comment) =>
+            comment.id !== commentId && comment.parent_comment_id !== commentId,
+        ),
       );
+
+      if (replyTo?.id === commentId) {
+        setReplyTo(null);
+      }
     } catch (err: any) {
       console.error("Failed to delete comment:", err);
       setError(
@@ -118,12 +158,19 @@ export default function CommentsSection({
     }
   };
 
-  const renderComment = (comment: Comment, compact = false) => {
+  const renderComment = (comment: Comment, isReply = false) => {
     const isAuthor =
       user != null && Number(user.id) === Number(comment.user_id);
 
+    const isLiking = likingIds.includes(comment.id);
+    const isLiked = Boolean(comment.userLiked);
+    const likesCount = Number(comment.likesCount || 0);
+
     return (
-      <article key={comment.id} className="flex gap-3">
+      <article
+        key={comment.id}
+        className={`flex gap-3 ${isReply ? "ml-8 border-l-2 border-gray-200 pl-3 sm:ml-12" : ""}`}
+      >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
           {(comment.username || "U").charAt(0).toUpperCase()}
         </div>
@@ -142,6 +189,38 @@ export default function CommentsSection({
           <div className="mt-1 flex flex-wrap items-center gap-3 px-2 text-xs text-gray-500">
             <span>{new Date(comment.created_at).toLocaleString()}</span>
 
+            {user ? (
+              <button
+                type="button"
+                onClick={() => void handleLike(comment)}
+                disabled={isLiking}
+                aria-pressed={isLiked}
+                className={`font-semibold hover:underline disabled:opacity-50 ${
+                  isLiked ? "text-red-600" : "text-gray-500"
+                }`}
+              >
+                {isLiked ? "❤️ Liked" : "🤍 Like"} ({likesCount})
+              </button>
+            ) : (
+              <span>
+                🤍 {likesCount} {likesCount === 1 ? "like" : "likes"}
+              </span>
+            )}
+
+            {user && !isReply && (
+              <button
+                type="button"
+                onClick={() => {
+                  setReplyTo(comment);
+                  setContent("");
+                  setIsOpen(true);
+                }}
+                className="font-semibold text-blue-600 hover:underline"
+              >
+                Reply
+              </button>
+            )}
+
             {isAuthor && (
               <button
                 type="button"
@@ -153,16 +232,28 @@ export default function CommentsSection({
               </button>
             )}
           </div>
+
+          {!isReply &&
+            comments
+              .filter((item) => item.parent_comment_id === comment.id)
+              .map((reply) => (
+                <div key={reply.id} className="mt-3">
+                  {renderComment(reply, true)}
+                </div>
+              ))}
         </div>
       </article>
     );
   };
 
-  const firstComment = comments[0];
+  const topLevelComments = comments.filter(
+    (comment) => comment.parent_comment_id == null,
+  );
+
+  const firstComment = topLevelComments[0];
 
   return (
     <section className="mt-3 border-t border-gray-200 pt-3">
-      {/* Facebook-style comment counter */}
       <button
         type="button"
         onClick={() => setIsOpen((previous) => !previous)}
@@ -178,18 +269,17 @@ export default function CommentsSection({
         </span>
       </button>
 
-      {/* Always show the first comment below the group */}
       {!loading && !error && !isOpen && firstComment && (
         <div className="mt-2">
-          {renderComment(firstComment, true)}
+          {renderComment(firstComment)}
 
-          {comments.length > 1 && (
+          {topLevelComments.length > 1 && (
             <button
               type="button"
               onClick={() => setIsOpen(true)}
               className="ml-12 mt-2 text-sm font-semibold text-gray-500 hover:underline"
             >
-              View all {comments.length} comments
+              View all {topLevelComments.length} comments
             </button>
           )}
         </div>
@@ -208,18 +298,17 @@ export default function CommentsSection({
         </div>
       )}
 
-      {/* Expanded comments and comment form */}
       {isOpen && (
         <div className="mt-4 space-y-4">
           {loading ? (
             <p className="text-sm text-gray-500">Loading comments...</p>
-          ) : comments.length === 0 ? (
+          ) : topLevelComments.length === 0 ? (
             <p className="text-sm text-gray-500">
               No comments yet. Be the first to comment!
             </p>
           ) : (
             <div className="space-y-4">
-              {comments.map((comment) => renderComment(comment))}
+              {topLevelComments.map((comment) => renderComment(comment))}
             </div>
           )}
 
@@ -230,10 +319,28 @@ export default function CommentsSection({
               </div>
 
               <div className="min-w-0 flex-1">
+                {replyTo && (
+                  <div className="mb-2 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-sm">
+                    <span className="text-blue-700">
+                      Replying to <strong>{replyTo.username || "User"}</strong>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setReplyTo(null)}
+                      className="font-semibold text-gray-500 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
                 <textarea
                   value={content}
                   onChange={(event) => setContent(event.target.value)}
-                  placeholder="Write a comment..."
+                  placeholder={
+                    replyTo ? "Write a reply..." : "Write a comment..."
+                  }
                   rows={2}
                   maxLength={2000}
                   required
@@ -250,7 +357,7 @@ export default function CommentsSection({
                     disabled={!content.trim() || submitting}
                     className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {submitting ? "Posting..." : "Comment"}
+                    {submitting ? "Posting..." : replyTo ? "Reply" : "Comment"}
                   </button>
                 </div>
               </div>
